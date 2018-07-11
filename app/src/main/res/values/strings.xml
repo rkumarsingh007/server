@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Chat TCP</string>
+    <string name="message">Type a message</string>
+</resources>
