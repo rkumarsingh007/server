@@ -2,7 +2,6 @@ package com.example.raj.chattcp;
 
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.os.Handler;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -22,21 +21,18 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 
-public class MainActivity extends AppCompatActivity  {
+public class MainActivity extends AppCompatActivity   {
 
     public static Exception ex;
     public static EditText message;
     public static Button send;
-    public static int sport=9216;
-    public static Handler updateUIhandler;
+    public static int sport=6666;
     public static boolean server_status =true;
     public static ServerSocket ss=null;
     public static ArrayList<Data> messagesArray;
     public static MyAdapter myAdapter;
     public static ListView display;
     public static Socket s=null;
-    public static serverinback server;
-    public static Thread t;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -51,12 +47,18 @@ public class MainActivity extends AppCompatActivity  {
         ex = new Exception();
         try {
             ss = new ServerSocket(sport);
+            //ss.setSoTimeout(1600000);
         } catch (IOException e) {
             e.printStackTrace();
             stop();
         }
-        t= new Thread(new serverinback());
-        t.start();
+        new Thread(new serverinback()).start();
+        //server = new serverinback();
+        /*uihandler = new Handler(){
+            public void handleMessage(Message msg){
+                myAdapter.notifyDataSetChanged();
+            }
+        };*/
     }
     void stop(){
         try {
@@ -92,9 +94,6 @@ public class MainActivity extends AppCompatActivity  {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            finally {
-                t.interrupt();
-            }
         }
     }
     public void onButtonClick(){
@@ -107,18 +106,18 @@ public class MainActivity extends AppCompatActivity  {
                         message.setText(null);
                         return;
                     }
-                    messagesArray.add(new Data(message.getText().toString(), true));
-                    new ObjectOutputStream(s.getOutputStream()).writeObject(new Data(message.getText().toString(),true));
+                    if(message.getText().toString()==null){
+                        Toast.makeText(getApplicationContext(),"Enter somthing" , Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    Data example = new Data(message.getText().toString(),true);
+                    myAdapter.add(example);
+                    new ObjectOutputStream(s.getOutputStream()).writeObject(example);
                     message.setText(null);
                 }
                 catch (Exception ex){
-                    alert("Error" , ex.toString());
+                    alertfinish("Error" , ex.toString()+ "press Finish to close the app");
                 }
-                /*catch (UnknownHostException e) {
-                    Toast.makeText(getApplicationContext(),"Error : "+ e.toString(),Toast.LENGTH_SHORT).show();
-                } catch (IOException e) {
-                    Toast.makeText(getApplicationContext(),"Error : "+ e.toString(),Toast.LENGTH_SHORT).show();
-                }*/
             }
         });
     }
@@ -135,28 +134,56 @@ public class MainActivity extends AppCompatActivity  {
         });
         Alert.create().show();
     }
-
+    public void alertfinish(String title ,String body) {
+        final AlertDialog.Builder Alert = new AlertDialog.Builder(getApplicationContext());
+        Alert.setCancelable(true)
+                .setTitle(title)
+                .setMessage(body);
+        Alert.setNegativeButton("Finish", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+                stop();
+                Thread.currentThread().interrupt();
+                finish();
+            }
+        });
+        Alert.create().show();
+        //Thread.currentThread().interrupt();
+    }
     class serverinback implements Runnable{
         @Override
         public void run() {
-            while(server_status){
-                try{
-                    s = ss.accept();
-                    Toast.makeText(getApplicationContext(),"connection request "+ s.getInetAddress().toString(),Toast.LENGTH_LONG);
-                    //Communication commThread = new Communication(s);
-                    new Thread(new Communication(s)).start();
-                } catch (IOException e) {
-                    Toast.makeText(getApplicationContext(),"Error "+ e.toString(),Toast.LENGTH_SHORT).show();
-                    alert("Error", "Port busy "+ sport);
+            myAdapter.add(new Data("hi i am your server", true));
+            myAdapter.add(new Data("hi i am your client", false));
+            while(server_status) try {
+                //alert("weating","weating for a new user ;)" );
+                s = ss.accept();
+                Toast.makeText(getApplicationContext(), "connection request " + s.getInetAddress().toString(), Toast.LENGTH_LONG).show();
+                //Communication commThread = new Communication(s);
+                new Thread(new Communication(s)).start();
+            } catch (IOException e) {
+                Toast.makeText(getApplicationContext(), "Error " + e.toString(), Toast.LENGTH_SHORT).show();
+                alert("Error", "Port busy " + sport);
+            } finally {
+                if (ss != null) {
+                    try {
+                        ss.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
+            Thread.currentThread().interrupt();
         }
     }
     class Communication implements Runnable{
 
-        public Socket clientsocket ;
+        Thread thread;
+        public Socket clientsocket;
         public DataInputStream input;
         public Communication(Socket s){
+            thread = new Thread();
+
             this.clientsocket = s;
             try {
                 InputStream in = s.getInputStream();
@@ -174,18 +201,13 @@ public class MainActivity extends AppCompatActivity  {
                 if(inputLine==null){
                     throw ex;
                 }
-                messagesArray.add(new Data(inputLine.toString(), false));
+                myAdapter.add(example);
                 if (inputLine.toString().equals("STOP")) {
                     server_status = false;
                 }
-                display.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        myAdapter.notifyDataSetChanged();
-                    }
-                });
-                Toast.makeText(getApplicationContext(),"new message "+inputLine.toString(),Toast.LENGTH_LONG);
+                Toast.makeText(getApplicationContext(),"new message "+inputLine.toString(),Toast.LENGTH_LONG).show();
                 input.close();
+                Thread.currentThread().interrupt();
             } catch (IOException e) {
                 e.printStackTrace();
             } catch (ClassNotFoundException e) {
